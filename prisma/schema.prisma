@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// -----------------------------
+/// Better Auth (Prisma adapter)
+/// -----------------------------
+/// These models are intentionally generic so Better Auth can evolve without
+/// forcing app-level schema changes. Your domain models (Chat, ConnectedApp…)
+/// relate to `User` via `userId`.
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified Boolean?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  chats         Chat[]
+  connectedApps ConnectedApp[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String   @id @default(cuid())
+  userId                String
+  providerId            String
+  accountId             String
+  accessToken           String?  @db.Text
+  refreshToken          String?  @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?  @db.Text
+  /// For email/password, Better Auth stores the password hash in the credential account.
+  password              String?  @db.Text
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+/// -----------------------------
+/// Domain: Chat
+/// -----------------------------
+
+model Chat {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("chat")
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  chatId    String
+  role      MessageRole
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+  @@map("message")
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
+
+/// -----------------------------
+/// Domain: Connected Apps
+/// -----------------------------
+
+model ConnectedApp {
+  id        String           @id @default(cuid())
+  userId    String
+  /// Connector id, e.g. "google-calendar"
+  appId     String
+  status    ConnectedAppStatus @default(connected)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentials AppCredential[]
+
+  @@unique([userId, appId])
+  @@index([userId])
+  @@map("connected_app")
+}
+
+enum ConnectedAppStatus {
+  connected
+  disconnected
+  error
+}
+
+model AppCredential {
+  id             String   @id @default(cuid())
+  connectedAppId String
+  /// Type allows multiple credentials per app (refresh token, api key, etc.)
+  type           String
+  /// AES-GCM encrypted blob (see lib/security/crypto.ts)
+  encryptedValue String   @db.Text
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  connectedApp ConnectedApp @relation(fields: [connectedAppId], references: [id], onDelete: Cascade)
+
+  @@unique([connectedAppId, type])
+  @@index([connectedAppId])
+  @@map("app_credential")
+}
+
+

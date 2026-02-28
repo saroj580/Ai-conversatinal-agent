@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## ChatBB
+
+Production-oriented **Next.js 14 (App Router)** starter for an “All-in-One Chat App” where users can connect external apps (starting with **Google Calendar**) and chat with them.
+
+### Tech
+
+- **Next.js 14**, **TypeScript**, **TailwindCSS**, **shadcn/ui**
+- **Better Auth** (email/password)
+- **Vercel AI SDK** (`streamText`) + OpenAI provider
+- **PostgreSQL** via **Prisma**
+
+### Architecture (high level)
+
+- **UI**: `components/` (no business logic)
+- **AI orchestration**: `lib/ai/orchestrator.ts`
+- **App connectors**: `lib/apps/*`
+  - implement `AppConnector` in `lib/apps/base.ts`
+  - register in `lib/apps/registry.ts`
+- **DB layer**: `lib/db/prisma.ts` + `prisma/schema.prisma`
+- **Auth**: `lib/auth.ts` + Better Auth handler at `app/api/auth/[...better-auth]/route.ts`
 
 ## Getting Started
 
-First, run the development server:
+### 1) Configure env
+
+Copy `env.example` to your local env file and fill values:
+
+- `DATABASE_URL`
+- `OPENAI_API_KEY`
+- `BETTER_AUTH_SECRET`
+- `NEXT_PUBLIC_APP_URL`
+- Google OAuth vars (for Calendar)
+- `APP_CREDENTIAL_ENCRYPTION_KEY` (for storing refresh tokens in DB)
+
+### 2) Prisma
+
+Generate client + run migrations:
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+### 3) Run
+
+Start the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Key routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/`: landing (redirects to `/chat` if logged in)
+- `/login`, `/register`: email/password auth
+- `/chat`: protected chat UI
+- `/api/chat`: streaming chat endpoint (persists messages)
+- `/api/apps/*`: connect/disconnect apps + OAuth callback
 
-## Learn More
+### Adding a new app connector
 
-To learn more about Next.js, take a look at the following resources:
+1. Create `lib/apps/<your-app>/index.ts` implementing `AppConnector`
+2. Register it in `lib/apps/registry.ts`
+3. Add any OAuth routes under `app/api/apps/<your-app>/...`
+4. The “Connect Apps” dialog and orchestrator will pick it up automatically
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
