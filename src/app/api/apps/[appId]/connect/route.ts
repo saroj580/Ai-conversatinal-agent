@@ -16,8 +16,6 @@ export async function POST(
   const connector = getConnectorById(appId);
   if (!connector) return new Response("Unknown app", { status: 404 });
 
-  // Ensure a ConnectedApp row exists so UI can show the app in "disconnected" state
-  // until OAuth completes and credentials are saved.
   await prisma.connectedApp.upsert({
     where: { userId_appId: { userId: session.user.id, appId } },
     create: { userId: session.user.id, appId, status: "disconnected" },
@@ -29,7 +27,6 @@ export async function POST(
     return Response.json({ redirectUrl });
   }
 
-  // Generic hook for future apps:
   await connector.connect(session.user.id);
   return Response.json({ redirectUrl: null });
 }
